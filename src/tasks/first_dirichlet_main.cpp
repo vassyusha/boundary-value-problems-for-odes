@@ -128,7 +128,6 @@ bool accuracy_achieved = false;
         
         n *= mult;
     }
-    bool accuracy_achieved = (max_diff <= input.tolerance);
 
     std::ostringstream noteStr;
     noteStr << "Для решения задачи использована равномерная сетка с числом разбиений n = " << n << ";\n"
