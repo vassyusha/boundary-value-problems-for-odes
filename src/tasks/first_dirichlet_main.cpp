@@ -100,7 +100,7 @@ TaskResult runFirstDirichletMainTask(const InputData& input, const VariantData& 
     double max_x = 0.0;
     int max_i = 0;
 
-    while (true) {
+    while (n * mult <= input.maxSegments) {
         v = solveGrid(n, xi, mu1, mu2);
         v2 = solveGrid(n * mult, xi, mu1, mu2);
 
