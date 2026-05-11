@@ -12,12 +12,12 @@
 
 namespace {
 
-constexpr double kLeft =  1.0;
-constexpr double kRight = 1.39561;
-constexpr double qLeft =  0.33334;
-constexpr double qRight = 1.11111;
-constexpr double fLeft =  1.0;
-constexpr double fRight = 0.66667;
+constexpr double kLeft = 1.0;
+const double kRight = std::exp(1.0 / 3.0);
+constexpr double qLeft = 1.0 / 3.0;
+constexpr double qRight = 10.0 / 9.0;
+constexpr double fLeft = -2.0 / 3.0;
+constexpr double fRight = 1.0;
 
 double integratePiecewiseConst(double left, double right, double xi, double leftValue, double rightValue) {
     if (right <= left) {
