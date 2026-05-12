@@ -143,10 +143,10 @@ GridSolution solveForN(int n, const VariantData& variant) {
     const double dRightBoundary = coefficientD(n, n, h, xi);
     const double phiRightBoundary = coefficientPhi(n, n, h, xi);
 
-    // Balance on [x_{n-1/2}, x_n] with k(1)u'(1)=mu2, so w(1)=-mu2.
+    // Balance on [x_{n-1/2}, x_n] with w(1)=mu2, so k(1)u'(1)=-mu2.
     lower[static_cast<size_t>(n - 1)] = -aRightBoundary / h;
     diagonal[static_cast<size_t>(n)] = aRightBoundary / h + 0.5 * h * dRightBoundary;
-    rhs[static_cast<size_t>(n)] = 0.5 * h * phiRightBoundary + variant.mu2;
+    rhs[static_cast<size_t>(n)] = 0.5 * h * phiRightBoundary - variant.mu2;
 
     return GridSolution{n, solveTridiagonal(lower, diagonal, upper, rhs)};
 }
@@ -232,7 +232,7 @@ TaskResult runMixedMainImprovedTask(const InputData& input, const VariantData& v
         "mixed-main-improved",
         "Смешанная краевая основная задача, улучшенная аппроксимация ГУ",
         "4. Смешанная основная, улучш. ГУ",
-        "u(0)=mu1, k(1)u'(1)=mu2",
+        "u(0)=mu1, w(1)=mu2",
         "Метод баланса на правой половинной ячейке",
         "Смешанная краевая основная задача, улучш. аппрокс. ГУ",
         makeMainTaskColumns());
@@ -243,7 +243,7 @@ TaskResult runMixedMainImprovedTask(const InputData& input, const VariantData& v
     std::ostringstream note;
     note << "Для основной смешанной задачи использована равномерная сетка с n = "
          << solution.coarse.n << ".\n"
-         << "Правая граничная производная задана как k(1)u'(1)=mu2, что эквивалентно w(1)=-mu2.\n"
+         << "Правое граничное условие задано как w(1)=mu2, что эквивалентно k(1)u'(1)=-mu2.\n"
          << "Улучшенная аппроксимация ГУ получена методом баланса на отрезке [x_{n-1/2}, x_n].\n"
          << "Заданная точность epsilon = " << formatScientific(input.tolerance) << ".\n"
          << "Достигнутая точность epsilon_2 = max|v(x_i)-v2(x_{2i})| = "

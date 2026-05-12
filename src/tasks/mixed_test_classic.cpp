@@ -1,6 +1,5 @@
 #include "tasks/mixed_test_classic.hpp"
 
-#include "solver.hpp"
 #include "task_utils.hpp"
 
 #include <algorithm>
@@ -14,26 +13,30 @@
 
 namespace {
 
-double u(double x, const VariantData& data) {
-    if (x < 0.0 || x > 1.0) {
+constexpr int kMinMaxSegmentsForMixedTest = 10485760;
+constexpr int kMaxTableRowsForMixedTest = 2000;
+using Real = long double;
+
+Real u(Real x, const VariantData& data) {
+    if (x < 0.0L || x > 1.0L) {
         throw std::out_of_range("x out of range");
     }
 
-    double c1 = 0.0;
-    double c2 = 0.0;
-    double lambda = 0.0;
-    double partial = 0.0;
+    Real c1 = 0.0L;
+    Real c2 = 0.0L;
+    Real lambda = 0.0L;
+    Real partial = 0.0L;
 
-    if (x < data.xi) {
-        c1 = 1.707840332398475;
-        c2 = 2.292159667601525;
-        lambda = 1.0 / std::sqrt(3.0);
-        partial = -2.0;
+    if (x < static_cast<Real>(data.xi)) {
+        c1 = 0.483632517628627L;
+        c2 = 3.516367482371373L;
+        lambda = 1.0L / std::sqrt(3.0L);
+        partial = -2.0L;
     } else {
-        c1 = 0.43894043381611791;
-        c2 = 0.65473977978033082;
-        lambda = std::sqrt(10.0 / (9.0 * std::exp(1.0 / 3.0)));
-        partial = 0.9;
+        c1 = -0.167479338834967L;
+        c2 = 0.962310572012318L;
+        lambda = std::sqrt(10.0L / (9.0L * std::exp(1.0L / 3.0L)));
+        partial = 0.9L;
     }
 
     return c1 * std::exp(lambda * x) + c2 * std::exp(-lambda * x) + partial;
@@ -41,83 +44,110 @@ double u(double x, const VariantData& data) {
 
 struct GridSolution {
     int n = 0;
-    std::vector<double> values;
+    std::vector<Real> values;
 };
 
-GridSolution solveAnalytic(int n, const VariantData& variant) {
-    std::vector<double> res(n + 1);
-    const double h = 1.0 / static_cast<double>(n);
-
-    for (int i = 0; i <= n; ++i) {
-        res[static_cast<size_t>(i)] = u(i * h, variant);
-    }
-
-    return GridSolution{n, res};
-}
-
 struct AccuracyCheck {
-    double epsilon = 0.0;
-    double x = 0.0;
+    Real epsilon = 0.0L;
+    Real x = 0.0L;
     int index = 0;
 };
 
-double integrateK(double left, double right, double xi) {
+Real integrateK(Real left, Real right, Real xi) {
 
-    const double k1_star = 1.0;
-    const double k2_star = std::exp(1.0 / 3.0);
-    const double inv_k1 = 1.0 / k1_star;  // = 1
-    const double inv_k2 = 1.0 / k2_star;  // = e^{-1/3}
+    const Real k1_star = 1.0L;
+    const Real k2_star = std::exp(1.0L / 3.0L);
+    const Real inv_k1 = 1.0L / k1_star;  // = 1
+    const Real inv_k2 = 1.0L / k2_star;  // = e^{-1/3}
     
-    if (right <= left) return 0.0;
+    if (right <= left) return 0.0L;
     if (right <= xi) return inv_k1 * (right - left);
     if (left >= xi) return inv_k2 * (right - left);
     return inv_k1 * (xi - left) + inv_k2 * (right - xi);
 }
 
-double integrateQ(double left, double right, double xi) {
-    const double q1 = 1.0 / 3.0;
-    const double q2 = 10.0 / 9.0;
+Real integrateQ(Real left, Real right, Real xi) {
+    const Real q1 = 1.0L / 3.0L;
+    const Real q2 = 10.0L / 9.0L;
     
-    if (right <= left) return 0.0;
+    if (right <= left) return 0.0L;
     if (right <= xi) return q1 * (right - left);
     if (left >= xi) return q2 * (right - left);
     return q1 * (xi - left) + q2 * (right - xi);
 }
 
-double integrateF(double left, double right, double xi) {
-    const double f1 = -2.0 / 3.0;
-    const double f2 = 1.0;
+Real integrateF(Real left, Real right, Real xi) {
+    const Real f1 = -2.0L / 3.0L;
+    const Real f2 = 1.0L;
     
-    if (right <= left) return 0.0;
+    if (right <= left) return 0.0L;
     if (right <= xi) return f1 * (right - left);
     if (left >= xi) return f2 * (right - left);
     return f1 * (xi - left) + f2 * (right - xi);
 }
 
-double coefficientA(int i, double h, double xi) {
-    const double left = static_cast<double>(i - 1) * h;
-    const double right = static_cast<double>(i) * h;
-    const double integral = integrateK(left, right, xi);
-    if (integral <= 0.0) {
+Real coefficientA(int i, Real h, Real xi) {
+    const Real left = static_cast<Real>(i - 1) * h;
+    const Real right = static_cast<Real>(i) * h;
+    const Real integral = integrateK(left, right, xi);
+    if (integral <= 0.0L) {
         throw std::runtime_error("Invalid integral for coefficient a_i");
     }
     return h / integral;
 }
 
-double coefficientD(int i, int n, double h, double xi) {
-    const double x = static_cast<double>(i) * h;
-    const double left = std::max(0.0, x - 0.5 * h);
-    const double right = std::min(1.0, x + 0.5 * h);
-    const double width = right - left;
+Real coefficientD(int i, int n, Real h, Real xi) {
+    const Real x = static_cast<Real>(i) * h;
+    const Real left = std::max(0.0L, x - 0.5L * h);
+    const Real right = std::min(1.0L, x + 0.5L * h);
+    const Real width = right - left;
     return integrateQ(left, right, xi) / width;
 }
 
-double coefficientPhi(int i, int n, double h, double xi) {
-    const double x = static_cast<double>(i) * h;
-    const double left = std::max(0.0, x - 0.5 * h);
-    const double right = std::min(1.0, x + 0.5 * h);
-    const double width = right - left;
+Real coefficientPhi(int i, int n, Real h, Real xi) {
+    const Real x = static_cast<Real>(i) * h;
+    const Real left = std::max(0.0L, x - 0.5L * h);
+    const Real right = std::min(1.0L, x + 0.5L * h);
+    const Real width = right - left;
     return integrateF(left, right, xi) / width;
+}
+
+std::vector<Real> solveTridiagonalLongDouble(
+    const std::vector<Real>& lower,
+    const std::vector<Real>& diagonal,
+    const std::vector<Real>& upper,
+    const std::vector<Real>& rhs) {
+
+    const size_t n = diagonal.size();
+    if (rhs.size() != n || lower.size() + 1 < n || upper.size() + 1 < n) {
+        throw std::runtime_error("Invalid tridiagonal system size");
+    }
+
+    std::vector<Real> cPrime(n, 0.0L);
+    std::vector<Real> dPrime(n, 0.0L);
+
+    if (std::abs(diagonal[0]) < 1e-30L) {
+        throw std::runtime_error("Degenerate tridiagonal matrix");
+    }
+
+    cPrime[0] = n > 1 ? upper[0] / diagonal[0] : 0.0L;
+    dPrime[0] = rhs[0] / diagonal[0];
+
+    for (size_t i = 1; i < n; ++i) {
+        const Real denom = diagonal[i] - lower[i - 1] * cPrime[i - 1];
+        if (std::abs(denom) < 1e-30L) {
+            throw std::runtime_error("Degenerate tridiagonal matrix");
+        }
+        cPrime[i] = (i + 1 < n) ? upper[i] / denom : 0.0L;
+        dPrime[i] = (rhs[i] - lower[i - 1] * dPrime[i - 1]) / denom;
+    }
+
+    std::vector<Real> x(n, 0.0L);
+    x[n - 1] = dPrime[n - 1];
+    for (size_t i = n - 1; i-- > 0;) {
+        x[i] = dPrime[i] - cPrime[i] * x[i + 1];
+    }
+    return x;
 }
 
 GridSolution solveForN(int n, const VariantData& variant) {
@@ -126,51 +156,47 @@ GridSolution solveForN(int n, const VariantData& variant) {
     }
 
     const int size = n + 1;
-    const double h = 1.0 / static_cast<double>(n);
-    const double h2 = h * h;
-    const double xi = variant.xi;
+    const Real h = 1.0L / static_cast<Real>(n);
+    const Real xi = static_cast<Real>(variant.xi);
 
-    std::vector<double> lower(static_cast<size_t>(size - 1), 0.0);
-    std::vector<double> diagonal(static_cast<size_t>(size), 0.0);
-    std::vector<double> upper(static_cast<size_t>(size - 1), 0.0);
-    std::vector<double> rhs(static_cast<size_t>(size), 0.0);
+    std::vector<Real> lower(static_cast<size_t>(size - 1), 0.0L);
+    std::vector<Real> diagonal(static_cast<size_t>(size), 0.0L);
+    std::vector<Real> upper(static_cast<size_t>(size - 1), 0.0L);
+    std::vector<Real> rhs(static_cast<size_t>(size), 0.0L);
 
-    diagonal[0] = 1.0;
-    rhs[0] = variant.mu1;
+    diagonal[0] = 1.0L;
+    rhs[0] = static_cast<Real>(variant.mu1);
 
     for (int i = 1; i <= n - 1; ++i) {
-        const double aLeft = coefficientA(i, h, xi);
-        const double aRight = coefficientA(i + 1, h, xi);
-        const double d = coefficientD(i, n, h, xi);
-        const double phi = coefficientPhi(i, n, h, xi);
+        const Real aLeft = coefficientA(i, h, xi);
+        const Real aRight = coefficientA(i + 1, h, xi);
+        const Real d = coefficientD(i, n, h, xi);
+        const Real phi = coefficientPhi(i, n, h, xi);
 
-        lower[static_cast<size_t>(i - 1)] = -aLeft / h2;
-        diagonal[static_cast<size_t>(i)] = (aLeft + aRight) / h2 + d;
-        upper[static_cast<size_t>(i)] = -aRight / h2;
-        rhs[static_cast<size_t>(i)] = phi;
+        lower[static_cast<size_t>(i - 1)] = -aLeft / h;
+        diagonal[static_cast<size_t>(i)] = (aLeft + aRight) / h + d * h;
+        upper[static_cast<size_t>(i)] = -aRight / h;
+        rhs[static_cast<size_t>(i)] = phi * h;
     }
 
-    const double aRightBoundary = coefficientA(n, h, xi);
+    const Real aRightBoundary = coefficientA(n, h, xi);
     lower[static_cast<size_t>(n - 1)] = -aRightBoundary / h;
     diagonal[static_cast<size_t>(n)] = aRightBoundary / h;
-    rhs[static_cast<size_t>(n)] = variant.mu2;
+    rhs[static_cast<size_t>(n)] = -static_cast<Real>(variant.mu2);
 
-    return GridSolution{n, solveTridiagonal(lower, diagonal, upper, rhs)};
+    return GridSolution{n, solveTridiagonalLongDouble(lower, diagonal, upper, rhs)};
 }
 
-AccuracyCheck compareOnCommonNodes(const GridSolution& comp, const GridSolution& ana) {
-    if (comp.n != ana.n) {
-        throw std::runtime_error("analytic grid must have as many segments as computed grid");
-    }
-
+AccuracyCheck compareWithAnalytic(const GridSolution& comp, const VariantData& variant) {
     AccuracyCheck check;
     for (int i = 0; i <= comp.n; ++i) {
-        const double difference = comp.values[static_cast<size_t>(i)] - ana.values[static_cast<size_t>(i)];
-        const double absDifference = std::abs(difference);
+        const Real x = static_cast<Real>(i) / static_cast<Real>(comp.n);
+        const Real difference = comp.values[static_cast<size_t>(i)] - u(x, variant);
+        const Real absDifference = std::abs(difference);
         if (absDifference > check.epsilon) {
             check.epsilon = absDifference;
             check.index = i;
-            check.x = static_cast<double>(i) / static_cast<double>(comp.n);
+            check.x = x;
         }
     }
     return check;
@@ -178,57 +204,67 @@ AccuracyCheck compareOnCommonNodes(const GridSolution& comp, const GridSolution&
 
 struct RefinedSolution {
     GridSolution computed;
-    GridSolution analytic;
     AccuracyCheck check;
     bool meetsTolerance = false;
+    bool stoppedOnErrorGrowth = false;
 };
 
 RefinedSolution solveWithRefinement(const InputData& input, const VariantData& variant) {
     int n = std::max(1, input.segments);
-    const int maxN = std::max(n, input.maxSegments);
+    const int maxN = std::max({n, input.maxSegments, kMinMaxSegmentsForMixedTest});
     const int multiplier = std::max(2, input.refinementMultiplier);
+    RefinedSolution best;
+    bool hasBest = false;
 
     while (true) {
         GridSolution comp = solveForN(n, variant);
-        GridSolution ana = solveAnalytic(n, variant);
-        AccuracyCheck check = compareOnCommonNodes(comp, ana);
-        const bool meetsTolerance = check.epsilon <= input.tolerance;
+        AccuracyCheck check = compareWithAnalytic(comp, variant);
+        const bool meetsTolerance = check.epsilon <= static_cast<Real>(input.tolerance);
+
+        if (!hasBest || check.epsilon < best.check.epsilon) {
+            best = RefinedSolution{std::move(comp), check, meetsTolerance, false};
+            hasBest = true;
+        } else {
+            best.stoppedOnErrorGrowth = true;
+            return best;
+        }
 
         if (meetsTolerance || n >= maxN || n > maxN / multiplier) {
-            return RefinedSolution{std::move(comp), std::move(ana), check, meetsTolerance};
+            return best;
         }
 
         n *= multiplier;
     }
 }
 
-std::string formatScientific(double value) {
+std::string formatScientific(Real value) {
     std::ostringstream out;
-    out << std::scientific << std::setprecision(6) << value;
+    out << std::scientific << std::setprecision(6) << static_cast<double>(value);
     return out.str();
 }
 
-void fillRows(TaskResult& task, const RefinedSolution& solution, int tableStride) {
+void fillRows(TaskResult& task, const RefinedSolution& solution, const VariantData& variant, int tableStride) {
     const int stride = std::max(1, tableStride);
     const int n = solution.computed.n;
 
     for (int i = 0; i <= n; i += stride) {
-        const double v = solution.computed.values[static_cast<size_t>(i)];
-        const double u = solution.analytic.values[static_cast<size_t>(i)];
+        const Real x = static_cast<Real>(i) / static_cast<Real>(n);
+        const Real v = solution.computed.values[static_cast<size_t>(i)];
+        const Real exact = u(x, variant);
         task.rows.push_back(TableRow{
             i,
-            static_cast<double>(i) / static_cast<double>(n),
-            u,
-            v,
+            static_cast<double>(x),
+            static_cast<double>(exact),
+            static_cast<double>(v),
             0.0,
-            u - v
+            static_cast<double>(exact - v)
         });
     }
 
     if (task.rows.empty() || task.rows.back().index != n) {
-        const double v = solution.computed.values[static_cast<size_t>(n)];
-        const double u = solution.analytic.values[static_cast<size_t>(n)];
-        task.rows.push_back(TableRow{n, 1.0, u, v, 0.0, u - v});
+        const Real v = solution.computed.values[static_cast<size_t>(n)];
+        const Real exact = u(1.0L, variant);
+        task.rows.push_back(TableRow{n, 1.0, static_cast<double>(exact), static_cast<double>(v), 0.0, static_cast<double>(exact - v)});
     }
 }
 
@@ -245,13 +281,23 @@ TaskResult runMixedTestClassicTask(const InputData& input, const VariantData& va
         makeTestTaskColumns());
 
     const RefinedSolution solution = solveWithRefinement(input, variant);
-    fillRows(result, solution, input.tableStride);
+    const int outputStride = std::max({
+        1,
+        input.tableStride,
+        solution.computed.n / kMaxTableRowsForMixedTest
+    });
+    fillRows(result, solution, variant, outputStride);
 
     std::ostringstream note;
     note << "Для тестовой смешанной задачи использована равномерная сетка с n = "
          << solution.computed.n << ".\n"
-         << "Правое граничное условие: k(1)u'(1)=mu2. Классическая аппроксимация: "
-         << "k(1)(v_n-v_{n-1})/h = mu2.\n"
+         << "Правое граничное условие: w(1)=mu2, то есть k(1)u'(1)=-mu2. Классическая аппроксимация: "
+         << "k(1)(v_n-v_{n-1})/h = -mu2.\n"
+         << "Для этой задачи maxSegments увеличен до " << kMinMaxSegmentsForMixedTest
+         << ", строки таблицы выведены с шагом " << outputStride << ".\n"
+         << (solution.stoppedOnErrorGrowth
+                 ? "При дальнейшем сгущении сетки ошибка начала расти, поэтому выведено лучшее найденное решение.\n"
+                 : "")
          << "Коэффициенты тестовой задачи k*, q*, f* заданы как предел соответствующей функции при x -> xi слева или справа и равны:\n"
          << "k1* = 1; k2* = exp(1/3);\n"
          << "q1* = 1/3; q2* = 10/9;\n"
