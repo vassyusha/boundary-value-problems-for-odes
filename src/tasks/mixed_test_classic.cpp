@@ -3,11 +3,14 @@
 #include "solver.hpp"
 #include "task_utils.hpp"
 
+#include <algorithm>
+#include <cmath>
+#include <iomanip>
+#include <sstream>
 #include <stdexcept>
 #include <string>
-#include <sstream>
-#include <iomanip>
-#include <iostream>
+#include <utility>
+#include <vector>
 
 namespace {
     
