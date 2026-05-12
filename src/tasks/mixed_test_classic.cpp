@@ -11,6 +11,7 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include <iostream>
 
 namespace {
 
@@ -25,14 +26,14 @@ double u(double x, const VariantData& data) {
     double partial = 0.0;
 
     if (x < data.xi) {
+        lambda = 1.0 / std::sqrt(3.0);
         c1 = 1.707840332398475;
         c2 = 2.292159667601525;
-        lambda = 1.0 / std::sqrt(3.0);
         partial = -2.0;
     } else {
-        c1 = 0.43894043381611791;
-        c2 = 0.65473977978033082;
         lambda = std::sqrt(10.0 / (9.0 * std::exp(1.0 / 3.0)));
+        c1 = 0.438940433816118;
+        c2 = 0.654739779780331;
         partial = 0.9;
     }
 
@@ -120,6 +121,7 @@ double coefficientPhi(int i, int n, double h, double xi) {
     return integrateF(left, right, xi) / width;
 }
 
+
 GridSolution solveForN(int n, const VariantData& variant) {
     if (n < 1) {
         throw std::runtime_error("n must be positive");
@@ -151,9 +153,13 @@ GridSolution solveForN(int n, const VariantData& variant) {
     }
 
     const double aRightBoundary = coefficientA(n, h, xi);
+    const double dRightBoundary = coefficientD(n, n, h, xi);
+    const double phiRightBoundary = coefficientPhi(n, n, h, xi);
+
+    // Balance on [x_{n-1/2}, x_n] with k(1)u'(1)=mu2, so w(1)=-mu2.
     lower[static_cast<size_t>(n - 1)] = -aRightBoundary / h;
-    diagonal[static_cast<size_t>(n)] = aRightBoundary / h;
-    rhs[static_cast<size_t>(n)] = variant.mu2;
+    diagonal[static_cast<size_t>(n)] = aRightBoundary / h + 0.5 * h * dRightBoundary;
+    rhs[static_cast<size_t>(n)] = 0.5 * h * phiRightBoundary + variant.mu2;
 
     return GridSolution{n, solveTridiagonal(lower, diagonal, upper, rhs)};
 }
