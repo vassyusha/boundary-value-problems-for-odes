@@ -902,7 +902,7 @@ class LabUI(tk.Tk):
             f"Задача: {task.get('title', task_def['title'])}\n"
             f"Тип условий: {task.get('boundaryKind', '')}\n"
             f"Аппроксимация: {task.get('approximationKind', '')}\n"
-            f"Работу выполнил: {task.get('ownerHint', task_def['owner'])}\n"
+            f"Работу выполнил(а): {task.get('ownerHint', task_def['owner'])}\n"
             f"Строк таблицы: {rows_count}\n\n"
             f"{note}"
         )
@@ -1011,12 +1011,13 @@ class LabUI(tk.Tk):
 
         rows = task["rows"]
         x = [row["x"] for row in rows]
+        column_keys = {column.get("key") for column in task.get("columns", [])}
         fig, ax = plt.subplots(num=task.get("shortTitle", "График"), figsize=(9.8, 5.8), clear=True)
         if mode == "solution":
-            if any("u" in row for row in rows):
+            if "u" in column_keys:
                 ax.plot(x, [row.get("u", 0.0) for row in rows], label="u(x)", linewidth=2, color="#3b82f6")
             ax.plot(x, [row.get("v", 0.0) for row in rows], label="v(x)", linestyle="--", color="#f97316")
-            if any("v2" in row for row in rows):
+            if "v2" in column_keys:
                 ax.plot(x, [row.get("v2", 0.0) for row in rows], label="v2(x)", linestyle=":", color="#10b981")
         else:
             ax.plot(x, [row.get("difference", 0.0) for row in rows], label="Разность", color="#d97706")
