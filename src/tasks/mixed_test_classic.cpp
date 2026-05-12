@@ -141,7 +141,9 @@ GridSolution solveForN(int n, const VariantData& variant) {
         rhs[static_cast<size_t>(i)] = phi;
     }
 
-    diagonal[static_cast<size_t>(n)] = 1.0;
+    const double aRightBoundary = coefficientA(n, h, xi);
+    lower[static_cast<size_t>(n - 1)] = -aRightBoundary / h;
+    diagonal[static_cast<size_t>(n)] = aRightBoundary / h;
     rhs[static_cast<size_t>(n)] = variant.mu2;
 
     return GridSolution{n, solveTridiagonal(lower, diagonal, upper, rhs)};
