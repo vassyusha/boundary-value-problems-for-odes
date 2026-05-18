@@ -16,6 +16,10 @@ namespace {
 constexpr int kMinMaxSegmentsForMixedTest = 10485760;
 constexpr int kMaxTableRowsForMixedTest = 2000;
 using Real = long double;
+constexpr Real kGamma1 = 1.0L;
+constexpr Real kGamma2 = 2.0L;
+constexpr Real kTheta1 = 3.0L;
+constexpr Real kTheta2 = 4.0L;
 
 Real u(Real x, const VariantData& data) {
     if (x < 0.0L || x > 1.0L) {
@@ -28,13 +32,13 @@ Real u(Real x, const VariantData& data) {
     Real partial = 0.0L;
 
     if (x < static_cast<Real>(data.xi)) {
-        c1 = 0.483632517628627L;
-        c2 = 3.516367482371373L;
+        c1 = 2.137730248054328L;
+        c2 = 2.597069887476066L;
         lambda = 1.0L / std::sqrt(3.0L);
         partial = -2.0L;
     } else {
-        c1 = -0.167479338834967L;
-        c2 = 0.962310572012318L;
+        c1 = 0.736243285201879L;
+        c2 = 1.191698220955875L;
         lambda = std::sqrt(10.0L / (9.0L * std::exp(1.0L / 3.0L)));
         partial = 0.9L;
     }
@@ -164,8 +168,10 @@ GridSolution solveForN(int n, const VariantData& variant) {
     std::vector<Real> upper(static_cast<size_t>(size - 1), 0.0L);
     std::vector<Real> rhs(static_cast<size_t>(size), 0.0L);
 
-    diagonal[0] = 1.0L;
-    rhs[0] = static_cast<Real>(variant.mu1);
+    const Real aLeftBoundary = coefficientA(1, h, xi);
+    diagonal[0] = aLeftBoundary / h + kGamma1;
+    upper[0] = -aLeftBoundary / h;
+    rhs[0] = kGamma1 * kTheta1;
 
     for (int i = 1; i <= n - 1; ++i) {
         const Real aLeft = coefficientA(i, h, xi);
@@ -181,8 +187,8 @@ GridSolution solveForN(int n, const VariantData& variant) {
 
     const Real aRightBoundary = coefficientA(n, h, xi);
     lower[static_cast<size_t>(n - 1)] = -aRightBoundary / h;
-    diagonal[static_cast<size_t>(n)] = aRightBoundary / h;
-    rhs[static_cast<size_t>(n)] = -static_cast<Real>(variant.mu2);
+    diagonal[static_cast<size_t>(n)] = aRightBoundary / h + kGamma2;
+    rhs[static_cast<size_t>(n)] = kGamma2 * kTheta2;
 
     return GridSolution{n, solveTridiagonalLongDouble(lower, diagonal, upper, rhs)};
 }
@@ -275,7 +281,7 @@ TaskResult runMixedTestClassicTask(const InputData& input, const VariantData& va
         "mixed-test-classic",
         "Смешанная краевая тестовая задача, классическая аппроксимация ГУ",
         "3. Смешанная тест.",
-        "Смешанные граничные условия",
+        "w(0)=-gamma1*(u(0)-theta1), w(1)=-gamma2*(theta2-u(1))",
         "Классическая аппроксимация граничных условий",
         "Романова Василиса",
         makeTestTaskColumns());
@@ -291,8 +297,11 @@ TaskResult runMixedTestClassicTask(const InputData& input, const VariantData& va
     std::ostringstream note;
     note << "Для тестовой смешанной задачи использована равномерная сетка с n = "
          << solution.computed.n << ".\n"
-         << "Правое граничное условие: w(1)=mu2, то есть k(1)u'(1)=-mu2. Классическая аппроксимация: "
-         << "k(1)(v_n-v_{n-1})/h = -mu2.\n"
+         << "Граничные условия 3-го рода: w(0)=-gamma1*(u(0)-theta1), w(1)=-gamma2*(theta2-u(1)).\n"
+         << "gamma1 = " << static_cast<double>(kGamma1) << ", gamma2 = " << static_cast<double>(kGamma2)
+         << ", theta1 = " << static_cast<double>(kTheta1) << ", theta2 = " << static_cast<double>(kTheta2) << ".\n"
+         << "Классическая аппроксимация ГУ: k(0)(v_1-v_0)/h = gamma1*(v_0-theta1), "
+         << "k(1)(v_n-v_{n-1})/h = gamma2*(theta2-v_n).\n"
          << "Для этой задачи maxSegments увеличен до " << kMinMaxSegmentsForMixedTest
          << ", строки таблицы выведены с шагом " << outputStride << ".\n"
          << (solution.stoppedOnErrorGrowth
