@@ -25,6 +25,10 @@ struct AccuracyCheck {
 };
 
 constexpr double kPi = 3.141592653589793238462643383279502884;
+constexpr double kGamma1 = 1.0;
+constexpr double kGamma2 = 2.0;
+constexpr double kTheta1 = 3.0;
+constexpr double kTheta2 = 4.0;
 
 double integralExpMinusSquare(double left, double right) {
     return 0.5 * std::sqrt(kPi) * (std::erf(right) - std::erf(left));
@@ -124,8 +128,14 @@ GridSolution solveForN(int n, const VariantData& variant) {
     std::vector<double> upper(static_cast<size_t>(size - 1), 0.0);
     std::vector<double> rhs(static_cast<size_t>(size), 0.0);
 
-    diagonal[0] = 1.0;
-    rhs[0] = variant.mu1;
+    const double aLeftBoundary = coefficientA(1, h, xi);
+    const double dLeftBoundary = coefficientD(0, n, h, xi);
+    const double phiLeftBoundary = coefficientPhi(0, n, h, xi);
+
+    // Third-kind condition on the left: w(0)=-gamma1*(u(0)-theta1).
+    diagonal[0] = aLeftBoundary / h + kGamma1 + 0.5 * h * dLeftBoundary;
+    upper[0] = -aLeftBoundary / h;
+    rhs[0] = 0.5 * h * phiLeftBoundary + kGamma1 * kTheta1;
 
     for (int i = 1; i <= n - 1; ++i) {
         const double aLeft = coefficientA(i, h, xi);
@@ -143,10 +153,10 @@ GridSolution solveForN(int n, const VariantData& variant) {
     const double dRightBoundary = coefficientD(n, n, h, xi);
     const double phiRightBoundary = coefficientPhi(n, n, h, xi);
 
-    // Balance on [x_{n-1/2}, x_n] with w(1)=mu2, so k(1)u'(1)=-mu2.
+    // Third-kind condition on the right: w(1)=-gamma2*(theta2-u(1)).
     lower[static_cast<size_t>(n - 1)] = -aRightBoundary / h;
-    diagonal[static_cast<size_t>(n)] = aRightBoundary / h + 0.5 * h * dRightBoundary;
-    rhs[static_cast<size_t>(n)] = 0.5 * h * phiRightBoundary - variant.mu2;
+    diagonal[static_cast<size_t>(n)] = aRightBoundary / h + kGamma2 + 0.5 * h * dRightBoundary;
+    rhs[static_cast<size_t>(n)] = 0.5 * h * phiRightBoundary + kGamma2 * kTheta2;
 
     return GridSolution{n, solveTridiagonal(lower, diagonal, upper, rhs)};
 }
@@ -232,8 +242,8 @@ TaskResult runMixedMainImprovedTask(const InputData& input, const VariantData& v
         "mixed-main-improved",
         "Смешанная краевая основная задача, улучшенная аппроксимация ГУ",
         "4. Смешанная основная, улучш. ГУ",
-        "u(0)=mu1, w(1)=mu2",
-        "Метод баланса на правой половинной ячейке",
+        "w(0)=-gamma1*(u(0)-theta1), w(1)=-gamma2*(theta2-u(1))",
+        "Метод баланса на левой и правой половинных ячейках",
         "Сахаров Александр",
         makeMainTaskColumns());
 
@@ -243,8 +253,10 @@ TaskResult runMixedMainImprovedTask(const InputData& input, const VariantData& v
     std::ostringstream note;
     note << "Для основной смешанной задачи использована равномерная сетка с n = "
          << solution.coarse.n << ".\n"
-         << "Правое граничное условие задано как w(1)=mu2, что эквивалентно k(1)u'(1)=-mu2.\n"
-         << "Улучшенная аппроксимация ГУ получена методом баланса на отрезке [x_{n-1/2}, x_n].\n"
+         << "Граничные условия 3-го рода: w(0)=-gamma1*(u(0)-theta1), w(1)=-gamma2*(theta2-u(1)).\n"
+         << "gamma1 = " << kGamma1 << ", gamma2 = " << kGamma2
+         << ", theta1 = " << kTheta1 << ", theta2 = " << kTheta2 << ".\n"
+         << "Улучшенная аппроксимация ГУ получена методом баланса на отрезках [x_0, x_{1/2}] и [x_{n-1/2}, x_n].\n"
          << "Заданная точность epsilon = " << formatScientific(input.tolerance) << ".\n"
          << "Достигнутая точность epsilon_2 = max|v(x_i)-v2(x_{2i})| = "
          << formatScientific(solution.check.epsilon) << ".\n"
